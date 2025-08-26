@@ -1,0 +1,187 @@
+# Development Configuration
+# Optimized for development and testing with mock providers and debugging
+
+# LLM Provider Configuration
+default_llm_provider: "mock"
+
+llm_providers:
+  # Mock provider for testing (no API calls)
+  mock:
+    provider: "mock"
+    model: "mock-gpt-3.5"
+    responses:
+      default: "This is a mock response for testing purposes."
+      sales: "Mock sales analysis: Customer interested in product X."
+      support: "Mock support response: Issue resolved successfully."
+    delay: 0.5  # Simulate API delay
+    failure_rate: 0.0  # 0% failure rate for stable testing
+  
+  # OpenAI for integration testing
+  openai_dev:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.1  # Low temperature for consistent test results
+      max_tokens: 500   # Lower token limit for faster responses
+    timeout: 15
+    max_retries: 1
+  
+  # Local LLM provider (if running locally)
+  local_llm:
+    provider: "ollama"
+    model: "llama2"
+    base_url: "http://localhost:11434"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1000
+    timeout: 60
+    max_retries: 1
+
+# Agent Configuration for Development
+agents:
+  test_agent:
+    name: "test_agent"
+    agent_type: "TestAgent"
+    enabled: true
+    llm_provider: "mock"
+    workflow_config:
+      max_retries: 1
+      timeout: 30
+      debug_mode: true
+      log_all_steps: true
+
+  debug_agent:
+    name: "debug_agent"
+    agent_type: "DebugAgent"
+    enabled: true
+    llm_provider: "mock"
+    workflow_config:
+      max_retries: 1
+      timeout: 60
+      verbose_logging: true
+      save_intermediate_results: true
+
+  integration_test_agent:
+    name: "integration_test_agent"
+    agent_type: "SalesAgent"
+    enabled: false  # Only enable for integration tests
+    llm_provider: "openai_dev"
+    workflow_config:
+      max_retries: 1
+      timeout: 120
+
+# Simple Test Criteria
+criteria:
+  - name: "test_sales"
+    priority: 10
+    enabled: true
+    description: "Test sales routing"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["test", "sales", "buy"]
+        case_sensitive: false
+    agent: "test_agent"
+
+  - name: "test_support"
+    priority: 8
+    enabled: true
+    description: "Test support routing"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["help", "support", "issue"]
+        case_sensitive: false
+    agent: "debug_agent"
+
+  - name: "catch_all_test"
+    priority: 1
+    enabled: true
+    description: "Catch all for testing"
+    conditions:
+      - field: "trigger.source"
+        operator: "contains"
+        values: ["test", "webhook", "email"]
+        case_sensitive: false
+    agent: "test_agent"
+
+# Development Email Configuration (disabled by default)
+email_config:
+  enabled: false  # Disable email polling in development
+  protocol: "IMAP"
+  host: "localhost"
+  port: 993
+  username: "test@localhost"
+  password: "test"
+  use_ssl: false
+  mailbox: "INBOX"
+  poll_interval: 300  # 5 minutes for development
+  max_messages_per_poll: 5
+
+# Framework Settings for Development
+fallback_agent: "test_agent"
+enable_monitoring: true
+log_level: "DEBUG"  # Verbose logging for development
+plugin_directories: ["plugins/", "test_plugins/"]
+
+# Development-specific settings
+development_settings:
+  mock_mode: true
+  save_test_data: true
+  test_data_directory: "test_data/"
+  enable_debug_endpoints: true
+  auto_reload_config: true
+  validate_responses: true
+
+# Test Data Configuration
+test_data:
+  sample_emails:
+    - subject: "Test sales inquiry"
+      sender: "customer@test.com"
+      body: "I want to buy your product"
+      expected_agent: "test_agent"
+    
+    - subject: "Help with issue"
+      sender: "user@test.com"
+      body: "I need support with my account"
+      expected_agent: "debug_agent"
+    
+    - subject: "General question"
+      sender: "general@test.com"
+      body: "What is your product about?"
+      expected_agent: "test_agent"
+
+  sample_webhooks:
+    - source: "test_webhook"
+      data:
+        type: "sales_inquiry"
+        customer: "Test Customer"
+        message: "Interested in pricing"
+      expected_agent: "test_agent"
+
+# Mock Response Templates
+mock_responses:
+  sales_analysis:
+    customer_problem: "Customer wants to purchase {{product}}"
+    proposed_solution: "Provide pricing information and demo"
+    urgency_level: "medium"
+    follow_up_required: true
+    key_points:
+      - "Customer is interested in {{product}}"
+      - "Needs pricing information"
+      - "Ready to make decision"
+
+  support_response:
+    issue_category: "{{category}}"
+    resolution_steps:
+      - "Identify the problem"
+      - "Apply standard solution"
+      - "Verify resolution"
+    escalation_required: false
+    estimated_resolution_time: "15 minutes"
+
+# Environment Variables for Development:
+# export OPENAI_API_KEY="sk-your-openai-key-here"  # Optional for integration tests
+# export DEBUG_MODE="true"
+# export TEST_MODE="true"

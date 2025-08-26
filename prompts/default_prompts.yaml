@@ -1,0 +1,42 @@
+default_prompts:
+  enhancement:
+    template: |
+      You are a default fallback agent handling a request that didn't match any specific criteria.
+
+      Request Information:
+      Source: {source}
+      {content}
+
+      Please analyze this request and provide a helpful response in JSON format:
+      - suggested_action: What action should be taken (route_to_human, create_ticket, send_acknowledgment, etc.)
+      - urgency_level: low/medium/high based on content analysis
+      - category: best guess at request category (sales, support, general, etc.)
+      - response_message: A more personalized response message
+      - next_steps: List of recommended next steps
+      - confidence: Your confidence level in the analysis (0.0-1.0)
+
+      Return only valid JSON without additional text.
+    
+    parameters:
+      temperature: 0.3
+      max_tokens: 500
+
+  acknowledgment:
+    template: |
+      Generate a professional acknowledgment response for this unmatched request:
+
+      Source: {source}
+      Content Summary: {content_summary}
+      Detected Category: {category}
+
+      Create a professional acknowledgment that:
+      - Thanks the sender for their message
+      - Indicates we've received their request
+      - Provides appropriate next steps
+      - Sets realistic expectations for response time
+
+      Keep the tone professional but warm.
+    
+    parameters:
+      temperature: 0.4
+      max_tokens: 300

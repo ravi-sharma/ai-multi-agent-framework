@@ -1,0 +1,164 @@
+# Sales-Focused Configuration
+# Optimized for sales teams processing customer inquiries and leads
+
+# LLM Provider Configuration
+default_llm_provider: "openai"
+
+llm_providers:
+  openai:
+    provider: "openai"
+    model: "gpt-4"  # Using GPT-4 for better sales analysis
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.3  # Lower temperature for more consistent responses
+      max_tokens: 2000  # Higher token limit for detailed sales notes
+    timeout: 45
+    max_retries: 3
+  
+  anthropic:
+    provider: "anthropic"
+    model: "claude-3-sonnet-20240229"
+    api_key: "${ANTHROPIC_API_KEY}"
+    parameters:
+      temperature: 0.3
+      max_tokens: 2000
+    timeout: 45
+    max_retries: 3
+
+# Agent Configuration
+agents:
+  sales_agent:
+    name: "sales_agent"
+    agent_type: "SalesAgent"
+    enabled: true
+    llm_provider: "openai"
+    workflow_config:
+      max_retries: 3
+      timeout: 300
+      enable_state_persistence: true
+      workflow_steps:
+        - "parse_email"
+        - "extract_customer_info"
+        - "analyze_intent"
+        - "generate_notes"
+        - "identify_follow_up_actions"
+
+  lead_qualification_agent:
+    name: "lead_qualification_agent"
+    agent_type: "LeadQualificationAgent"
+    enabled: true
+    llm_provider: "anthropic"
+    workflow_config:
+      max_retries: 2
+      timeout: 180
+
+  default_agent:
+    name: "default_agent"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+
+# Sales-Focused Routing Criteria
+criteria:
+  # High-priority sales inquiries
+  - name: "urgent_sales"
+    priority: 10
+    enabled: true
+    description: "Urgent sales inquiries requiring immediate attention"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["urgent", "ASAP", "immediate", "emergency", "today"]
+        case_sensitive: false
+      - field: "email.subject"
+        operator: "contains"
+        values: ["buy", "purchase", "quote", "pricing", "order"]
+        case_sensitive: false
+    agent: "sales_agent"
+
+  # General sales inquiries
+  - name: "sales_inquiry"
+    priority: 8
+    enabled: true
+    description: "General sales and product inquiries"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["buy", "purchase", "sale", "quote", "pricing", "cost", "price", "demo", "trial", "product"]
+        case_sensitive: false
+    agent: "sales_agent"
+
+  # Lead qualification
+  - name: "lead_qualification"
+    priority: 7
+    enabled: true
+    description: "Potential leads requiring qualification"
+    conditions:
+      - field: "email.body"
+        operator: "contains"
+        values: ["interested in", "looking for", "need information", "tell me more", "learn more"]
+        case_sensitive: false
+    agent: "lead_qualification_agent"
+
+  # Enterprise inquiries (high value)
+  - name: "enterprise_inquiry"
+    priority: 9
+    enabled: true
+    description: "Enterprise and high-value customer inquiries"
+    conditions:
+      - field: "email.sender"
+        operator: "contains"
+        values: ["@enterprise.com", "@corp.com", "@company.com"]
+        case_sensitive: false
+      - field: "email.body"
+        operator: "contains"
+        values: ["enterprise", "bulk", "volume", "corporate", "business"]
+        case_sensitive: false
+    agent: "sales_agent"
+
+  # Existing customer inquiries
+  - name: "existing_customer"
+    priority: 6
+    enabled: true
+    description: "Inquiries from existing customers"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["existing customer", "current client", "account", "renewal"]
+        case_sensitive: false
+    agent: "sales_agent"
+
+# Email Integration for Sales
+email_config:
+  protocol: "IMAP"
+  host: "${SALES_EMAIL_HOST}"
+  port: 993
+  username: "${SALES_EMAIL_USERNAME}"
+  password: "${SALES_EMAIL_PASSWORD}"
+  use_ssl: true
+  mailbox: "INBOX"
+  poll_interval: 30  # Check every 30 seconds for faster response
+  max_messages_per_poll: 20
+  auto_process: true
+  enabled: true
+
+# Framework Settings
+fallback_agent: "default_agent"
+enable_monitoring: true
+log_level: "INFO"
+plugin_directories: ["plugins/sales/"]
+
+# Sales-specific settings
+sales_settings:
+  auto_generate_follow_up: true
+  crm_integration: false  # Set to true if CRM integration is available
+  lead_scoring_enabled: true
+  notification_email: "${SALES_MANAGER_EMAIL}"
+
+# Environment Variables Required:
+# export OPENAI_API_KEY="sk-your-openai-key-here"
+# export ANTHROPIC_API_KEY="sk-ant-your-anthropic-key-here"
+# export SALES_EMAIL_HOST="imap.gmail.com"
+# export SALES_EMAIL_USERNAME="sales@yourcompany.com"
+# export SALES_EMAIL_PASSWORD="your-email-password"
+# export SALES_MANAGER_EMAIL="manager@yourcompany.com"

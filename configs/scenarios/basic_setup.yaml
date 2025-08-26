@@ -1,0 +1,49 @@
+# Basic Setup Configuration
+# This is the minimal configuration needed to get the AI Agent Framework running
+
+# LLM Provider Configuration
+default_llm_provider: "openai"
+
+llm_providers:
+  openai:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1000
+    timeout: 30
+    max_retries: 3
+
+# Agent Configuration
+agents:
+  default_agent:
+    name: "default_agent"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+    workflow_config:
+      max_retries: 2
+      timeout: 120
+
+# Basic Routing Criteria
+criteria:
+  - name: "catch_all"
+    priority: 1
+    enabled: true
+    description: "Route all requests to default agent"
+    conditions:
+      - field: "trigger.source"
+        operator: "contains"
+        values: ["webhook", "email", "api"]
+        case_sensitive: false
+    agent: "default_agent"
+
+# Framework Settings
+fallback_agent: "default_agent"
+enable_monitoring: false
+log_level: "INFO"
+plugin_directories: []
+
+# Environment Variables Required:
+# export OPENAI_API_KEY="sk-your-openai-key-here"

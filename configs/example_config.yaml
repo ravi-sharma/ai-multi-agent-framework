@@ -1,0 +1,86 @@
+# Example configuration for AI Agent Framework
+
+# Default LLM provider to use
+default_llm_provider: "openai"
+
+# LLM provider configurations
+llm_providers:
+  openai:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1000
+    timeout: 30
+    max_retries: 3
+  
+  anthropic:
+    provider: "anthropic"
+    model: "claude-3-sonnet-20240229"
+    api_key: "${ANTHROPIC_API_KEY}"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1000
+    timeout: 30
+    max_retries: 3
+
+# Agent configurations
+agents:
+  sales_agent:
+    name: "sales_agent"
+    agent_type: "SalesAgent"
+    enabled: true
+    llm_provider: "openai"
+    workflow_config:
+      max_retries: 3
+      timeout: 300
+      workflow_steps:
+        - "parse_email"
+        - "extract_customer_info"
+        - "analyze_intent"
+        - "generate_notes"
+  
+  default_agent:
+    name: "default_agent"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+    custom_config:
+      response_template: "Thank you for contacting us. We have received your message and will respond appropriately."
+      enable_llm_enhancement: true
+      log_unmatched_requests: true
+      include_request_summary: true
+
+# Routing criteria
+criteria:
+  - name: "sales_email"
+    priority: 1
+    agent: "sales_agent"
+    description: "Route sales-related emails to sales agent"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["buy", "sale", "purchase", "quote", "pricing"]
+        case_sensitive: false
+      - field: "email.body"
+        operator: "contains"
+        values: ["interested in", "looking to buy", "get a quote"]
+        case_sensitive: false
+  
+  - name: "support_email"
+    priority: 2
+    agent: "support_agent"
+    description: "Route support requests to support agent"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["help", "support", "issue", "problem", "bug"]
+        case_sensitive: false
+
+# Framework settings
+fallback_agent: "default_agent"
+enable_monitoring: true
+log_level: "INFO"
+plugin_directories:
+  - "plugins/"

@@ -1,0 +1,97 @@
+# Example configuration with email integration
+
+# LLM Provider Configuration
+default_llm_provider: "openai"
+llm_providers:
+  openai:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    timeout: 30
+    max_retries: 3
+  
+  anthropic:
+    provider: "anthropic"
+    model: "claude-3-sonnet-20240229"
+    api_key: "${ANTHROPIC_API_KEY}"
+    timeout: 30
+    max_retries: 3
+
+# Agent Configuration
+agents:
+  sales_agent:
+    name: "sales_agent"
+    agent_type: "SalesAgent"
+    enabled: true
+    llm_provider: "openai"
+    workflow_config:
+      agent_name: "sales_agent"
+      max_retries: 3
+      timeout: 300
+      retry_delay: 1.0
+      enable_state_persistence: true
+
+  default_agent:
+    name: "default_agent"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+
+# Routing Criteria
+criteria:
+  - name: "sales_email"
+    priority: 1
+    enabled: true
+    description: "Route sales-related emails to sales agent"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["buy", "purchase", "sale", "quote", "pricing", "cost", "price"]
+        case_sensitive: false
+      - field: "email.body"
+        operator: "contains"
+        values: ["interested in", "want to buy", "need pricing", "get a quote"]
+        case_sensitive: false
+    agent: "sales_agent"
+
+  - name: "support_email"
+    priority: 2
+    enabled: true
+    description: "Route support-related emails to support agent"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["help", "support", "issue", "problem", "bug", "error"]
+        case_sensitive: false
+    agent: "default_agent"
+
+# Email Integration Configuration
+email_config:
+  # Email protocol: IMAP or POP3
+  protocol: "IMAP"
+  
+  # Email server settings
+  host: "${EMAIL_HOST}"  # e.g., imap.gmail.com
+  port: 993  # 993 for IMAP SSL, 995 for POP3 SSL
+  username: "${EMAIL_USERNAME}"
+  password: "${EMAIL_PASSWORD}"
+  use_ssl: true
+  
+  # IMAP-specific settings
+  mailbox: "INBOX"  # Mailbox to monitor (IMAP only)
+  
+  # Polling configuration
+  poll_interval: 60  # Poll every 60 seconds
+  max_messages_per_poll: 10  # Maximum messages to process per poll
+  
+  # Processing configuration
+  auto_process: true  # Automatically process emails as triggers
+  
+  # Enable/disable email integration
+  enabled: true
+
+# Framework Settings
+fallback_agent: "default_agent"
+enable_monitoring: true
+log_level: "INFO"
+plugin_directories: []

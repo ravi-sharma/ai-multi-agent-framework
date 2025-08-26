@@ -1,0 +1,213 @@
+# Multi-Provider Configuration
+# Demonstrates using multiple LLM providers with fallback and load balancing
+
+# LLM Provider Configuration
+default_llm_provider: "openai"
+
+llm_providers:
+  # Primary OpenAI configuration
+  openai:
+    provider: "openai"
+    model: "gpt-4"
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1500
+    timeout: 30
+    max_retries: 2
+    rate_limit: 60  # requests per minute
+  
+  # Secondary OpenAI with different model
+  openai_turbo:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1000
+    timeout: 20
+    max_retries: 3
+    rate_limit: 100
+  
+  # Anthropic Claude
+  anthropic:
+    provider: "anthropic"
+    model: "claude-3-sonnet-20240229"
+    api_key: "${ANTHROPIC_API_KEY}"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1500
+    timeout: 30
+    max_retries: 2
+    rate_limit: 50
+  
+  # Azure OpenAI (if available)
+  azure_openai:
+    provider: "azure_openai"
+    model: "gpt-4"
+    api_key: "${AZURE_OPENAI_API_KEY}"
+    base_url: "${AZURE_OPENAI_ENDPOINT}"
+    api_version: "2024-02-15-preview"
+    parameters:
+      temperature: 0.7
+      max_tokens: 1500
+    timeout: 30
+    max_retries: 2
+    rate_limit: 80
+
+# Fallback Configuration
+fallback_config:
+  # Primary fallback order
+  primary_fallback_order:
+    - "anthropic"
+    - "openai_turbo"
+    - "azure_openai"
+  
+  # Provider-specific fallbacks
+  provider_fallbacks:
+    openai: ["anthropic", "azure_openai"]
+    anthropic: ["openai", "openai_turbo"]
+    azure_openai: ["openai", "anthropic"]
+  
+  # Retry configuration
+  max_fallback_attempts: 3
+  fallback_delay: 2.0  # seconds between fallback attempts
+
+# Agent Configuration with Provider Diversity
+agents:
+  # High-performance agent using GPT-4
+  premium_agent:
+    name: "premium_agent"
+    agent_type: "PremiumAgent"
+    enabled: true
+    llm_provider: "openai"  # Primary: GPT-4
+    fallback_providers: ["anthropic", "azure_openai"]
+    workflow_config:
+      max_retries: 3
+      timeout: 300
+      enable_provider_switching: true
+
+  # Fast response agent using GPT-3.5
+  quick_agent:
+    name: "quick_agent"
+    agent_type: "QuickResponseAgent"
+    enabled: true
+    llm_provider: "openai_turbo"  # Primary: GPT-3.5 Turbo
+    fallback_providers: ["anthropic"]
+    workflow_config:
+      max_retries: 2
+      timeout: 120
+      enable_provider_switching: true
+
+  # Analysis agent using Claude
+  analysis_agent:
+    name: "analysis_agent"
+    agent_type: "AnalysisAgent"
+    enabled: true
+    llm_provider: "anthropic"  # Primary: Claude
+    fallback_providers: ["openai", "azure_openai"]
+    workflow_config:
+      max_retries: 3
+      timeout: 240
+      enable_provider_switching: true
+
+  # Load-balanced agent
+  balanced_agent:
+    name: "balanced_agent"
+    agent_type: "LoadBalancedAgent"
+    enabled: true
+    llm_provider: "round_robin"  # Special provider for load balancing
+    provider_pool: ["openai_turbo", "anthropic", "azure_openai"]
+    workflow_config:
+      max_retries: 2
+      timeout: 180
+      load_balancing_strategy: "round_robin"
+
+# Routing Criteria with Provider Optimization
+criteria:
+  # Complex analysis tasks -> Claude (better at reasoning)
+  - name: "complex_analysis"
+    priority: 10
+    enabled: true
+    description: "Complex analysis and reasoning tasks"
+    conditions:
+      - field: "email.body"
+        operator: "contains"
+        values: ["analyze", "complex", "detailed analysis", "reasoning", "logic"]
+        case_sensitive: false
+    agent: "analysis_agent"
+
+  # Quick responses -> GPT-3.5 Turbo (faster and cheaper)
+  - name: "quick_responses"
+    priority: 8
+    enabled: true
+    description: "Simple questions requiring quick responses"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["quick question", "simple", "brief", "fast"]
+        case_sensitive: false
+    agent: "quick_agent"
+
+  # Premium customers -> GPT-4 (highest quality)
+  - name: "premium_customers"
+    priority: 15
+    enabled: true
+    description: "Premium customers get highest quality responses"
+    conditions:
+      - field: "email.sender"
+        operator: "contains"
+        values: ["@premium.com", "@vip.com", "@enterprise.com"]
+        case_sensitive: false
+    agent: "premium_agent"
+
+  # High volume periods -> Load balanced
+  - name: "load_balanced"
+    priority: 5
+    enabled: true
+    description: "Load balanced processing for high volume"
+    conditions:
+      - field: "trigger.source"
+        operator: "equals"
+        values: ["webhook", "api"]
+        case_sensitive: false
+    agent: "balanced_agent"
+
+# Load Balancing Configuration
+load_balancing:
+  strategies:
+    round_robin:
+      providers: ["openai_turbo", "anthropic", "azure_openai"]
+      weights: [1, 1, 1]  # Equal weights
+    
+    weighted:
+      providers: ["openai", "anthropic", "openai_turbo"]
+      weights: [3, 2, 1]  # Prefer OpenAI GPT-4, then Claude, then GPT-3.5
+    
+    cost_optimized:
+      providers: ["openai_turbo", "anthropic", "openai"]
+      weights: [3, 2, 1]  # Prefer cheaper options first
+
+# Monitoring and Analytics
+monitoring:
+  provider_metrics: true
+  cost_tracking: true
+  performance_tracking: true
+  failure_tracking: true
+  
+  alerts:
+    provider_failure_threshold: 5  # Alert after 5 consecutive failures
+    cost_threshold: 100.0  # Alert when daily cost exceeds $100
+    latency_threshold: 45.0  # Alert when average latency > 45 seconds
+
+# Framework Settings
+fallback_agent: "balanced_agent"
+enable_monitoring: true
+log_level: "INFO"
+plugin_directories: ["plugins/"]
+
+# Environment Variables Required:
+# export OPENAI_API_KEY="sk-your-openai-key-here"
+# export ANTHROPIC_API_KEY="sk-ant-your-anthropic-key-here"
+# export AZURE_OPENAI_API_KEY="your-azure-key-here"
+# export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"

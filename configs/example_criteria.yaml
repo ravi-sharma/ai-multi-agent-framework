@@ -1,0 +1,145 @@
+# Example criteria configuration for the AI Agent Framework
+# This file demonstrates various criteria patterns and operators
+
+criteria:
+  # Sales-related emails with high priority
+  - name: "sales_urgent"
+    description: "Urgent sales inquiries requiring immediate attention"
+    priority: 10
+    enabled: true
+    agent: "sales_agent"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["urgent", "ASAP", "immediate", "emergency"]
+        case_sensitive: false
+      - field: "email.subject"
+        operator: "contains"
+        values: ["buy", "purchase", "quote", "pricing", "sale"]
+        case_sensitive: false
+
+  # General sales emails
+  - name: "sales_general"
+    description: "General sales inquiries"
+    priority: 5
+    enabled: true
+    agent: "sales_agent"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["buy", "purchase", "quote", "pricing", "sale", "product", "demo"]
+        case_sensitive: false
+
+  # Support requests
+  - name: "support_requests"
+    description: "Customer support and help requests"
+    priority: 7
+    enabled: true
+    agent: "support_agent"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["help", "support", "issue", "problem", "bug", "error", "broken"]
+        case_sensitive: false
+
+  # VIP customer emails (high priority)
+  - name: "vip_customers"
+    description: "Emails from VIP customers"
+    priority: 15
+    enabled: true
+    agent: "vip_agent"
+    conditions:
+      - field: "email.sender"
+        operator: "contains"
+        values: ["@vip.com", "@enterprise.com", "@premium.com"]
+        case_sensitive: false
+
+  # Regex pattern matching for order numbers
+  - name: "order_inquiries"
+    description: "Emails containing order numbers"
+    priority: 8
+    enabled: true
+    agent: "order_agent"
+    conditions:
+      - field: "email.body"
+        operator: "regex"
+        values: ["order\\s*#?\\s*\\d{6,}", "ORDER-\\d{4,}"]
+        case_sensitive: false
+
+  # Exact match for specific subjects
+  - name: "refund_requests"
+    description: "Refund request emails"
+    priority: 9
+    enabled: true
+    agent: "refund_agent"
+    conditions:
+      - field: "email.subject"
+        operator: "equals"
+        values: ["Refund Request", "Request for Refund", "REFUND"]
+        case_sensitive: false
+
+  # Emails starting with specific prefixes
+  - name: "billing_inquiries"
+    description: "Billing and payment related emails"
+    priority: 6
+    enabled: true
+    agent: "billing_agent"
+    conditions:
+      - field: "email.subject"
+        operator: "starts_with"
+        values: ["Billing:", "Payment:", "Invoice:", "[BILLING]"]
+        case_sensitive: false
+
+  # Emails ending with specific suffixes
+  - name: "automated_reports"
+    description: "Automated system reports"
+    priority: 1
+    enabled: true
+    agent: "report_agent"
+    conditions:
+      - field: "email.subject"
+        operator: "ends_with"
+        values: ["- Report", "- Alert", "- Notification"]
+        case_sensitive: false
+
+  # Numeric comparisons (for webhook data)
+  - name: "high_value_transactions"
+    description: "High value transaction alerts"
+    priority: 12
+    enabled: true
+    agent: "finance_agent"
+    conditions:
+      - field: "transaction.amount"
+        operator: "greater_than"
+        values: [10000]
+
+  # Multiple conditions (AND logic by default)
+  - name: "critical_system_alerts"
+    description: "Critical system alerts from monitoring"
+    priority: 20
+    enabled: true
+    agent: "ops_agent"
+    conditions:
+      - field: "alert.severity"
+        operator: "equals"
+        values: ["critical", "high"]
+        case_sensitive: false
+      - field: "alert.source"
+        operator: "contains"
+        values: ["production", "prod"]
+        case_sensitive: false
+      - field: "alert.downtime"
+        operator: "greater_than"
+        values: [300]  # More than 5 minutes
+
+  # Case-sensitive matching
+  - name: "api_errors"
+    description: "API error notifications"
+    priority: 11
+    enabled: true
+    agent: "api_agent"
+    conditions:
+      - field: "error.type"
+        operator: "equals"
+        values: ["APIError", "AuthenticationError", "RateLimitError"]
+        case_sensitive: true

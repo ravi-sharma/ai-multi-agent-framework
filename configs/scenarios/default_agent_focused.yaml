@@ -1,0 +1,100 @@
+# Default Agent Focused Configuration
+# This configuration demonstrates various DefaultAgent settings
+
+# Default LLM provider to use
+default_llm_provider: "openai"
+
+# LLM provider configurations
+llm_providers:
+  openai:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.3  # Lower temperature for more consistent responses
+      max_tokens: 500   # Shorter responses for fallback scenarios
+    timeout: 30
+    max_retries: 3
+
+# Agent configurations
+agents:
+  # Basic default agent with minimal configuration
+  basic_default_agent:
+    name: "basic_default_agent"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+    custom_config:
+      response_template: "Thank you for your message. We have received your request and will respond appropriately."
+      enable_llm_enhancement: false
+      log_unmatched_requests: true
+      include_request_summary: true
+
+  # Enhanced default agent with LLM capabilities
+  enhanced_default_agent:
+    name: "enhanced_default_agent"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+    custom_config:
+      response_template: "Thank you for contacting us. We are analyzing your request to provide the best assistance."
+      enable_llm_enhancement: true
+      log_unmatched_requests: true
+      include_request_summary: true
+
+  # Silent default agent for minimal logging
+  silent_default_agent:
+    name: "silent_default_agent"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+    custom_config:
+      response_template: "Request received."
+      enable_llm_enhancement: false
+      log_unmatched_requests: false
+      include_request_summary: false
+
+  # Customer service focused default agent
+  customer_service_default:
+    name: "customer_service_default"
+    agent_type: "DefaultAgent"
+    enabled: true
+    llm_provider: "openai"
+    custom_config:
+      response_template: "Thank you for reaching out to our customer service team. We value your inquiry and will ensure it receives proper attention. A team member will review your message and respond within 24 hours."
+      enable_llm_enhancement: true
+      log_unmatched_requests: true
+      include_request_summary: true
+
+# Routing criteria - very specific to ensure most requests go to default agent
+criteria:
+  - name: "exact_sales_match"
+    priority: 1
+    agent: "sales_agent"  # This would need to be defined if used
+    description: "Only exact sales keywords"
+    conditions:
+      - field: "email.subject"
+        operator: "equals"
+        values: ["SALES INQUIRY", "BUY NOW", "PURCHASE REQUEST"]
+        case_sensitive: false
+
+# Framework settings - use enhanced default agent as fallback
+fallback_agent: "enhanced_default_agent"
+enable_monitoring: true
+log_level: "INFO"
+plugin_directories:
+  - "plugins/"
+
+# Email configuration for testing
+# email_config:
+#   protocol: "IMAP"
+#   host: "imap.gmail.com"
+#   port: 993
+#   username: "${EMAIL_USERNAME}"
+#   password: "${EMAIL_PASSWORD}"
+#   use_ssl: true
+#   mailbox: "INBOX"
+#   poll_interval: 60
+#   max_messages_per_poll: 5
+#   auto_process: true
+#   enabled: false

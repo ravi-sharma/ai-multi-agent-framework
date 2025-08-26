@@ -1,0 +1,199 @@
+# Customer Support Configuration
+# Optimized for customer support teams handling help requests and issues
+
+# LLM Provider Configuration
+default_llm_provider: "anthropic"  # Claude is excellent for support scenarios
+
+llm_providers:
+  anthropic:
+    provider: "anthropic"
+    model: "claude-3-sonnet-20240229"
+    api_key: "${ANTHROPIC_API_KEY}"
+    parameters:
+      temperature: 0.4  # Balanced for helpful but consistent responses
+      max_tokens: 1500
+    timeout: 30
+    max_retries: 3
+  
+  openai:
+    provider: "openai"
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    parameters:
+      temperature: 0.4
+      max_tokens: 1500
+    timeout: 30
+    max_retries: 3
+
+# Agent Configuration
+agents:
+  support_agent:
+    name: "support_agent"
+    agent_type: "SupportAgent"
+    enabled: true
+    llm_provider: "anthropic"
+    workflow_config:
+      max_retries: 3
+      timeout: 240
+      enable_escalation: true
+      workflow_steps:
+        - "categorize_issue"
+        - "extract_problem_details"
+        - "search_knowledge_base"
+        - "generate_solution"
+        - "create_ticket"
+
+  technical_support_agent:
+    name: "technical_support_agent"
+    agent_type: "TechnicalSupportAgent"
+    enabled: true
+    llm_provider: "openai"
+    workflow_config:
+      max_retries: 2
+      timeout: 300
+      require_technical_validation: true
+
+  billing_support_agent:
+    name: "billing_support_agent"
+    agent_type: "BillingSupportAgent"
+    enabled: true
+    llm_provider: "anthropic"
+    workflow_config:
+      max_retries: 2
+      timeout: 180
+      enable_payment_verification: true
+
+  escalation_agent:
+    name: "escalation_agent"
+    agent_type: "EscalationAgent"
+    enabled: true
+    llm_provider: "openai"
+    workflow_config:
+      max_retries: 1
+      timeout: 120
+      notify_human_agent: true
+
+# Support-Focused Routing Criteria
+criteria:
+  # Critical issues requiring immediate attention
+  - name: "critical_issues"
+    priority: 15
+    enabled: true
+    description: "Critical system issues and outages"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["critical", "urgent", "down", "outage", "emergency", "broken", "not working"]
+        case_sensitive: false
+      - field: "email.body"
+        operator: "contains"
+        values: ["can't access", "system down", "not responding", "error 500"]
+        case_sensitive: false
+    agent: "escalation_agent"
+
+  # Technical support issues
+  - name: "technical_support"
+    priority: 10
+    enabled: true
+    description: "Technical issues and troubleshooting requests"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["technical", "bug", "error", "API", "integration", "code", "developer"]
+        case_sensitive: false
+    agent: "technical_support_agent"
+
+  # Billing and payment issues
+  - name: "billing_support"
+    priority: 12
+    enabled: true
+    description: "Billing, payment, and account issues"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["billing", "payment", "invoice", "charge", "refund", "account", "subscription"]
+        case_sensitive: false
+    agent: "billing_support_agent"
+
+  # General support requests
+  - name: "general_support"
+    priority: 8
+    enabled: true
+    description: "General help and support requests"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["help", "support", "question", "how to", "issue", "problem"]
+        case_sensitive: false
+    agent: "support_agent"
+
+  # Feature requests and feedback
+  - name: "feature_requests"
+    priority: 5
+    enabled: true
+    description: "Feature requests and product feedback"
+    conditions:
+      - field: "email.subject"
+        operator: "contains"
+        values: ["feature request", "suggestion", "feedback", "improvement", "enhancement"]
+        case_sensitive: false
+    agent: "support_agent"
+
+  # VIP customer support
+  - name: "vip_support"
+    priority: 20
+    enabled: true
+    description: "Support requests from VIP customers"
+    conditions:
+      - field: "email.sender"
+        operator: "contains"
+        values: ["@vip.com", "@premium.com", "@enterprise.com"]
+        case_sensitive: false
+    agent: "escalation_agent"
+
+# Email Integration for Support
+email_config:
+  protocol: "IMAP"
+  host: "${SUPPORT_EMAIL_HOST}"
+  port: 993
+  username: "${SUPPORT_EMAIL_USERNAME}"
+  password: "${SUPPORT_EMAIL_PASSWORD}"
+  use_ssl: true
+  mailbox: "INBOX"
+  poll_interval: 60  # Check every minute
+  max_messages_per_poll: 15
+  auto_process: true
+  enabled: true
+
+# Framework Settings
+fallback_agent: "support_agent"
+enable_monitoring: true
+log_level: "INFO"
+plugin_directories: ["plugins/support/"]
+
+# Support-specific settings
+support_settings:
+  auto_create_tickets: true
+  ticket_system_integration: false  # Set to true if ticket system is available
+  escalation_threshold: 2  # Escalate after 2 failed attempts
+  knowledge_base_enabled: true
+  sla_tracking: true
+  notification_channels:
+    - email: "${SUPPORT_MANAGER_EMAIL}"
+    - slack: "${SUPPORT_SLACK_WEBHOOK}"
+
+# SLA Configuration
+sla_config:
+  critical: 15  # 15 minutes for critical issues
+  high: 60      # 1 hour for high priority
+  medium: 240   # 4 hours for medium priority
+  low: 1440     # 24 hours for low priority
+
+# Environment Variables Required:
+# export ANTHROPIC_API_KEY="sk-ant-your-anthropic-key-here"
+# export OPENAI_API_KEY="sk-your-openai-key-here"
+# export SUPPORT_EMAIL_HOST="imap.gmail.com"
+# export SUPPORT_EMAIL_USERNAME="support@yourcompany.com"
+# export SUPPORT_EMAIL_PASSWORD="your-email-password"
+# export SUPPORT_MANAGER_EMAIL="support-manager@yourcompany.com"
+# export SUPPORT_SLACK_WEBHOOK="https://hooks.slack.com/services/..."

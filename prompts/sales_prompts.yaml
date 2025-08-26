@@ -1,0 +1,103 @@
+sales_prompts:
+  customer_extraction:
+    template: |
+      Extract customer information from this email:
+
+      Subject: {subject}
+      From: {sender}
+      Body: {body}
+
+      Please extract and return the following information in JSON format:
+      - company_name: The company the customer represents (if mentioned)
+      - customer_name: The customer's name (if mentioned)
+      - industry: The industry or business type (if identifiable)
+      - company_size: Estimated company size (small/medium/large/enterprise)
+      - urgency_indicators: Any words or phrases indicating urgency
+      - budget_indicators: Any mentions of budget, pricing, or financial constraints
+
+      Return only valid JSON without additional text.
+    
+    parameters:
+      temperature: 0.3
+      max_tokens: 500
+
+  intent_analysis:
+    template: |
+      Analyze the customer intent and problems from this sales email:
+
+      Customer: {customer_email}
+      Company: {company_name}
+      Subject: {subject}
+      Body: {body}
+
+      Please analyze and return the following in JSON format:
+      - primary_intent: Main purpose (purchase, pricing, demo, information, support, partnership)
+      - secondary_intents: Other possible intents
+      - customer_problems: List of problems or pain points mentioned
+      - urgency_level: low/medium/high/critical based on language and context
+      - decision_stage: awareness/consideration/decision/purchase
+      - key_requirements: Specific requirements or needs mentioned
+      - budget_signals: Any indicators about budget or financial capacity
+
+      Return only valid JSON without additional text.
+    
+    parameters:
+      temperature: 0.2
+      max_tokens: 800
+
+  notes_generation:
+    template: |
+      Generate structured sales notes for this customer inquiry:
+
+      Customer Information:
+      - Email: {customer_email}
+      - Company: {company_name}
+      - Industry: {industry}
+
+      Email Content:
+      - Subject: {subject}
+      - Body: {body}
+
+      Intent Analysis:
+      - Primary Intent: {primary_intent}
+      - Problems: {customer_problems}
+      - Urgency: {urgency_level}
+
+      Please generate comprehensive sales notes in JSON format:
+      - customer_problem: Clear summary of the customer's problem or need
+      - proposed_solution: Specific solution recommendations
+      - urgency_level: low/medium/high/critical
+      - follow_up_required: true/false
+      - key_points: List of important points from the inquiry
+      - estimated_value: Estimated deal value if determinable (number or null)
+      - next_steps: List of specific next steps to take
+
+      Return only valid JSON without additional text.
+    
+    parameters:
+      temperature: 0.3
+      max_tokens: 1000
+
+  follow_up_email:
+    template: |
+      Generate a professional follow-up email based on this sales inquiry:
+
+      Customer: {customer_name} ({customer_email})
+      Company: {company_name}
+      Original Subject: {original_subject}
+      Customer Problem: {customer_problem}
+      Proposed Solution: {proposed_solution}
+      Urgency Level: {urgency_level}
+
+      Generate a professional, personalized follow-up email that:
+      - Acknowledges their specific needs
+      - Provides relevant solution information
+      - Includes appropriate next steps
+      - Matches the urgency level
+      - Maintains a professional but friendly tone
+
+      Format as a complete email with subject line.
+    
+    parameters:
+      temperature: 0.4
+      max_tokens: 600
