@@ -255,7 +255,7 @@ The included demo runs three scenarios:
 python3 main.py cli list-agents
 
 # Process email
-python3 main.py cli process-email --email-file sample.eml
+python3 main.py cli process-email examples/email_samples/sales_inquiry.json
 
 # Process webhook
 python3 main.py cli process-webhook --data '{"type": "support", "message": "Help needed"}'
@@ -684,3 +684,5 @@ client = Client(
 - Use environment variables for configuration
 - Avoid hardcoding credentials
 - Rotate API keys periodically
+
+Please feel free to reach out if you have any questions or need assistance with the framework. We're here to help!
