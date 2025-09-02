@@ -1,20 +1,34 @@
-"""Multi-agent workflow orchestration using LangGraph with LangSmith tracing."""
+"""Multi-agent workflow orchestration using LangGraph with enhanced tracing."""
 
 import logging
 import os
+import sys
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from langgraph.graph import StateGraph, END
-from langgraph.graph.state import CompiledStateGraph
-from langchain_core.runnables import RunnableConfig
+# Add project root to Python path
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+sys.path.insert(0, project_root)
 
-# Try to import LangSmith for tracing
+# Explicit imports with error handling
 try:
-    from langsmith import traceable
+    from langgraph.graph import StateGraph, END
+    from typing_extensions import TypedDict
+    from langchain_core.runnables import RunnableConfig
+except ImportError as e:
+    print(f"Import error: {e}")
+    print("Please ensure you have installed langgraph and langchain-core")
+    sys.exit(1)
+
+# LangSmith tracing
+try:
+    from langsmith import traceable, Client
+    
+    # Configure LangSmith client
+    client = Client()
     LANGSMITH_AVAILABLE = True
 except ImportError:
-    # Create a no-op decorator if LangSmith is not available
+    # Create no-op decorators if LangSmith is not available
     def traceable(name=None):
         def decorator(func):
             return func
@@ -23,56 +37,239 @@ except ImportError:
 
 logger = logging.getLogger(__name__)
 
+class WorkflowState(TypedDict):
+    """
+    Represents the state of the multi-agent workflow.
+    """
+    input_data: Dict[str, Any]
+    selected_agent: Optional[str]
+    agent_result: Optional[Any]
+    final_result: Optional[Dict[str, Any]]
+    errors: List[str]
+    metadata: Dict[str, Any]
 
 class MultiAgentGraph:
     """
-    Main orchestration graph that coordinates multiple agents.
+    Orchestrates multi-agent workflow using LangGraph.
     
-    This graph handles the routing and coordination of requests between
-    different specialized agents based on criteria and workflow requirements.
+    Manages routing, processing, and validation of requests 
+    across different agents.
     """
-    
-    def __init__(self, agents: Dict[str, Any], routing_config: Dict[str, Any] = None):
+    def __init__(self, agents: Dict[str, Any]):
         """
-        Initialize the multi-agent graph.
+        Initialize the multi-agent workflow graph.
         
         Args:
             agents: Dictionary of available agents
-            routing_config: Configuration for routing logic
         """
         self.agents = agents
-        self.routing_config = routing_config or {}
-        self.workflow: Optional[CompiledStateGraph] = None
-        self._setup_workflow()
+        self.workflow = None
+        self._build_graph()
     
-    def _setup_workflow(self) -> None:
-        """Set up the LangGraph workflow for multi-agent coordination."""
-        # Create state graph
-        workflow = StateGraph(dict)
+    def _build_graph(self):
+        """
+        Construct the workflow graph with nodes and edges.
+        """
+        # Create a state graph
+        graph = StateGraph(WorkflowState)
         
-        # Add workflow nodes
-        workflow.add_node("route_request", self._route_request)
-        workflow.add_node("process_with_agent", self._process_with_agent)
-        workflow.add_node("validate_result", self._validate_result)
-        workflow.add_node("finalize_response", self._finalize_response)
+        # Add nodes for each workflow stage
+        graph.add_node("start", self._start_workflow)
+        graph.add_node("route_request", self._route_request)
+        graph.add_node("process_with_agent", self._process_with_agent)
+        graph.add_node("validate_result", self._validate_result)
+        graph.add_node("finalize_response", self._finalize_response)
+        graph.add_node("error_handler", self._error_handler)
         
-        # Define workflow edges
-        workflow.add_edge("route_request", "process_with_agent")
-        workflow.add_edge("process_with_agent", "validate_result")
-        workflow.add_edge("validate_result", "finalize_response")
-        workflow.add_edge("finalize_response", END)
+        # Define edges
+        graph.set_entry_point("start")
+        graph.add_edge("start", "route_request")
+        graph.add_edge("route_request", "process_with_agent")
+        graph.add_edge("process_with_agent", "validate_result")
         
-        # Set entry point
-        workflow.set_entry_point("route_request")
+        # Conditional edges for result validation
+        graph.add_conditional_edges(
+            "validate_result",
+            lambda state: "finalize_response" if state["agent_result"] and getattr(state["agent_result"], 'success', False) else "error_handler"
+        )
         
-        # Compile workflow
-        self.workflow = workflow.compile()
-        logger.info("Multi-agent workflow compiled successfully")
+        graph.add_edge("finalize_response", END)
+        graph.add_edge("error_handler", END)
+        
+        # Compile the graph
+        self.workflow = graph.compile()
+    
+    @traceable(name="start_workflow")
+    def _start_workflow(self, state: WorkflowState) -> WorkflowState:
+        """
+        Initialize workflow metadata and prepare for routing.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Updated workflow state with initialization metadata
+        """
+        state["metadata"]["start_time"] = datetime.now()
+        state["metadata"]["workflow_id"] = f"workflow_{datetime.now().timestamp()}"
+        
+        # Log workflow start
+        logger.info(f"Starting workflow: {state['metadata']['workflow_id']}")
+        
+        return state
+    
+    @traceable(name="route_request")
+    def _route_request(self, state: WorkflowState) -> WorkflowState:
+        """
+        Route the request to the appropriate agent.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Updated workflow state with selected agent
+        """
+        try:
+            # Extract input data from state
+            input_data = state["input_data"]
+            
+            # Default to default agent
+            selected_agent = 'default_agent'
+            
+            # Determine routing based on input type
+            if input_data.get('source') == 'email':
+                email_data = input_data.get('data', {}).get('email', {})
+                subject = email_data.get('subject', '').lower()
+                body = email_data.get('body', '').lower()
+                
+                # Routing logic
+                if any(keyword in subject or keyword in body for keyword in ['sales', 'pricing', 'enterprise', 'plan']):
+                    selected_agent = 'sales_agent'
+                elif any(keyword in subject or keyword in body for keyword in ['support', 'help', 'issue']):
+                    selected_agent = 'default_agent'
+            
+            # Update state with selected agent
+            state["selected_agent"] = selected_agent
+            
+            # Log routing decision
+            logger.info(f"Routed request to agent: {selected_agent}")
+            
+            return state
+        except Exception as e:
+            logger.error(f"Error in routing request: {e}")
+            state["errors"].append(str(e))
+            return state
+    
+    @traceable(name="process_with_agent")
+    async def _process_with_agent(self, state: WorkflowState) -> WorkflowState:
+        """
+        Process the request with the selected agent.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Updated workflow state with agent result
+        """
+        try:
+            # Ensure selected_agent is set
+            if not state["selected_agent"]:
+                state["selected_agent"] = 'default_agent'
+            
+            # Validate agent exists
+            if state["selected_agent"] not in self.agents:
+                raise ValueError(f"Agent '{state['selected_agent']}' not found")
+            
+            # Get the agent
+            agent = self.agents[state["selected_agent"]]
+            
+            # Process with the agent
+            result = await agent.process(state["input_data"])
+            
+            # Log processing result
+            logger.info(f"Agent {state['selected_agent']} processed request successfully")
+            
+            # Update state with agent result
+            state["agent_result"] = result
+            return state
+        except Exception as e:
+            logger.error(f"Error processing with agent {state.get('selected_agent', 'unknown')}: {e}")
+            state["errors"].append(str(e))
+            state["agent_result"] = None
+            return state
+    
+    @traceable(name="validate_result")
+    def _validate_result(self, state: WorkflowState) -> WorkflowState:
+        """
+        Validate the agent's processing result.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Updated workflow state with validation result
+        """
+        try:
+            agent_result = state["agent_result"]
+            if not agent_result or not getattr(agent_result, 'success', False):
+                state["errors"].append("Agent processing failed")
+                logger.warning("Result validation failed")
+            else:
+                logger.info("Result validation passed")
+            
+            return state
+        except Exception as e:
+            logger.error(f"Error validating result: {e}")
+            state["errors"].append(str(e))
+            return state
+    
+    @traceable(name="finalize_response")
+    def _finalize_response(self, state: WorkflowState) -> WorkflowState:
+        """
+        Compile final workflow response.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Final workflow state with processed result
+        """
+        try:
+            agent_result = state["agent_result"]
+            state["final_result"] = {
+                'agent': state["selected_agent"],
+                'output': getattr(agent_result, 'output', {}) if agent_result else {},
+                'metadata': state["metadata"],
+                'errors': state["errors"]
+            }
+            
+            # Log finalization details
+            logger.info(f"Finalized response for workflow {state['metadata'].get('workflow_id')}")
+            
+            return state
+        except Exception as e:
+            logger.error(f"Error finalizing response: {e}")
+            state["errors"].append(str(e))
+            return state
+    
+    @traceable(name="error_handler")
+    def _error_handler(self, state: WorkflowState) -> WorkflowState:
+        """
+        Handle workflow errors.
+        
+        Args:
+            state: Current workflow state
+            
+        Returns:
+            Updated workflow state with error details
+        """
+        logger.error(f"Workflow errors: {state['errors']}")
+        return state
     
     @traceable(name="multiagent_workflow")
     async def execute(self, input_data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Execute the multi-agent workflow.
+        Execute the multi-agent workflow using LangGraph.
         
         Args:
             input_data: Input data to process
@@ -84,7 +281,7 @@ class MultiAgentGraph:
             raise RuntimeError("Workflow not initialized")
         
         # Create initial state
-        initial_state = {
+        initial_state: WorkflowState = {
             "input_data": input_data,
             "selected_agent": None,
             "agent_result": None,
@@ -92,242 +289,65 @@ class MultiAgentGraph:
             "errors": [],
             "metadata": {
                 "start_time": datetime.now(),
-                "workflow_id": f"multiagent_{datetime.now().timestamp()}"
+                "workflow_id": f"multiagent_{datetime.now().timestamp()}",
             }
         }
         
-        # Execute workflow
-        final_state = await self.workflow.ainvoke(initial_state)
-        
-        return final_state.get("final_result", {})
-    
-    @traceable(name="route_request")
-    async def _route_request(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Route the request to the appropriate agent.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated state with selected agent
-        """
+        # Execute the workflow using LangGraph
         try:
-            input_data = state["input_data"]
+            # Use the compiled workflow with proper tracing
+            final_state = await self.workflow.ainvoke(initial_state)
             
-            # Simple routing logic - can be enhanced with criteria engine
-            selected_agent = self._select_agent(input_data)
+            # Ensure final result is set
+            if not final_state.get("final_result"):
+                agent_result = final_state.get("agent_result")
+                final_state["final_result"] = {
+                    'agent': final_state.get("selected_agent") or 'error',
+                    'output': getattr(agent_result, 'output', {}) if agent_result else {},
+                    'metadata': final_state.get("metadata", {}),
+                    'errors': final_state.get("errors", [])
+                }
             
-            state["selected_agent"] = selected_agent
-            logger.info(f"Routed request to agent: {selected_agent}")
-            
-            return state
-            
+            return final_state["final_result"]
         except Exception as e:
-            logger.error(f"Request routing failed: {e}")
-            if "errors" not in state:
-                state["errors"] = []
-            state["errors"].append(f"Routing failed: {str(e)}")
-            state["selected_agent"] = "default_agent"  # Fallback
-            return state
-    
-    @traceable(name="process_with_agent")
-    async def _process_with_agent(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Process the request with the selected agent.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated state with agent result
-        """
-        try:
-            selected_agent = state["selected_agent"]
-            input_data = state["input_data"]
-            
-            if selected_agent not in self.agents:
-                raise ValueError(f"Agent '{selected_agent}' not found")
-            
-            agent = self.agents[selected_agent]
-            result = await agent.process(input_data)
-            
-            state["agent_result"] = result
-            logger.info(f"Agent '{selected_agent}' processed request successfully")
-            
-            return state
-            
-        except Exception as e:
-            logger.error(f"Agent processing failed: {e}")
-            state["errors"].append(f"Agent processing failed: {str(e)}")
-            return state
-    
-    async def _validate_result(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Validate the agent result.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated state with validation status
-        """
-        try:
-            agent_result = state.get("agent_result")
-            
-            if not agent_result:
-                raise ValueError("No agent result to validate")
-            
-            # Basic validation - can be enhanced
-            is_valid = hasattr(agent_result, 'success') and agent_result.success
-            
-            if not is_valid:
-                state["errors"].append("Agent result validation failed")
-            
-            logger.info(f"Result validation: {'passed' if is_valid else 'failed'}")
-            
-            return state
-            
-        except Exception as e:
-            logger.error(f"Result validation failed: {e}")
-            state["errors"].append(f"Validation failed: {str(e)}")
-            return state
-    
-    async def _finalize_response(self, state: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Finalize the response.
-        
-        Args:
-            state: Current workflow state
-            
-        Returns:
-            Updated state with final result
-        """
-        try:
-            agent_result = state.get("agent_result")
-            errors = state.get("errors", [])
-            metadata = state.get("metadata", {})
-            
-            # Calculate execution time
-            start_time = metadata.get("start_time", datetime.now())
-            execution_time = (datetime.now() - start_time).total_seconds()
-            
-            # Create final result
-            final_result = {
-                "success": len(errors) == 0 and agent_result and agent_result.success,
-                "agent_name": state.get("selected_agent"),
-                "result": agent_result.output if agent_result else {},
-                "errors": errors,
-                "execution_time": execution_time,
-                "workflow_id": metadata.get("workflow_id"),
-                "timestamp": datetime.now().isoformat()
+            logger.error(f"Workflow execution failed: {e}")
+            return {
+                'agent': 'error_handler',
+                'output': {},
+                'metadata': initial_state["metadata"],
+                'errors': [str(e)]
             }
-            
-            state["final_result"] = final_result
-            logger.info(f"Finalized response with success: {final_result['success']}")
-            
-            return state
-            
-        except Exception as e:
-            logger.error(f"Response finalization failed: {e}")
-            state["errors"].append(f"Finalization failed: {str(e)}")
-            
-            # Create error result
-            final_result = {
-                "success": False,
-                "agent_name": state.get("selected_agent"),
-                "result": {},
-                "errors": state.get("errors", []),
-                "execution_time": 0.0,
-                "workflow_id": state.get("metadata", {}).get("workflow_id"),
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            state["final_result"] = final_result
-            return state
-    
-    def _select_agent(self, input_data: Dict[str, Any]) -> str:
-        """
-        Select the appropriate agent based on input data.
-        
-        Args:
-            input_data: Input data to analyze
-            
-        Returns:
-            Name of the selected agent
-        """
-        # Simple routing logic - can be enhanced with criteria engine
-        source = input_data.get("source", "unknown")
-        
-        # Check for email data
-        if "data" in input_data and "email" in input_data["data"]:
-            email_data = input_data["data"]["email"]
-            subject = email_data.get("subject", "").lower()
-            body = email_data.get("body", "").lower()
-            
-            # Sales keywords
-            sales_keywords = ["buy", "purchase", "price", "quote", "sales", "demo", "pricing", "want"]
-            if any(keyword in subject or keyword in body for keyword in sales_keywords):
-                return "sales_agent"
-        
-        # Default fallback
-        return "default_agent"
-    
-    def add_agent(self, name: str, agent: Any) -> None:
-        """
-        Add an agent to the graph.
-        
-        Args:
-            name: Agent name
-            agent: Agent instance
-        """
-        self.agents[name] = agent
-        logger.info(f"Added agent '{name}' to multi-agent graph")
-    
-    def remove_agent(self, name: str) -> None:
-        """
-        Remove an agent from the graph.
-        
-        Args:
-            name: Agent name to remove
-        """
-        if name in self.agents:
-            del self.agents[name]
-            logger.info(f"Removed agent '{name}' from multi-agent graph")
-    
-    def get_available_agents(self) -> List[str]:
-        """
-        Get list of available agent names.
-        
-        Returns:
-            List of agent names
-        """
-        return list(self.agents.keys())
 
-
-def create_graph(config: RunnableConfig):
+def create_graph():
     """
-    Factory function to create a compiled LangGraph workflow for LangGraph CLI.
+    Create and return the compiled multi-agent workflow graph for LangGraph API.
     
-    This function is called by LangGraph CLI to create the graph instance.
-    It takes a RunnableConfig as required by the CLI.
-    
-    Args:
-        config: RunnableConfig from LangGraph CLI
-        
     Returns:
-        Compiled LangGraph workflow
+        Compiled StateGraph for LangGraph API usage
     """
     # Import agents here to avoid circular imports
+    import os
+    
+    # Set default environment variables for LangGraph dev server
+    os.environ.setdefault('OPENAI_API_KEY', 'sk-test-key')
+    os.environ.setdefault('ANTHROPIC_API_KEY', 'test-key')
+    
     from agents.sales_agent import SalesAgent
     from agents.default_agent import DefaultAgent
+    from configs.base_config import BaseConfig
     
-    # Create default agents
+    # Initialize configuration and agents
+    config = BaseConfig()
     agents = {
-        "sales_agent": SalesAgent(),
-        "default_agent": DefaultAgent()
+        'sales_agent': SalesAgent(config),
+        'default_agent': DefaultAgent(config)
     }
     
-    # Create the graph and return the compiled workflow
-    graph = MultiAgentGraph(agents)
-    return graph.workflow
+    # Create the multi-agent graph
+    graph_instance = MultiAgentGraph(agents)
+    
+    # Return the compiled workflow
+    return graph_instance.workflow
+
+# Export both the class and the create_graph function
+__all__ = ['MultiAgentGraph', 'create_graph']

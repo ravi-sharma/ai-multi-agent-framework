@@ -43,11 +43,94 @@ The AI Agent Framework is a modular Python library that enables organizations to
 
 ## ⚡ Quick Start
 
-### Prerequisites
+### 🛠 Prerequisites
 
-- Python 3.11+ (required for LangGraph CLI)
-- API keys for LLM providers
-- LangSmith API key (optional, for tracing)
+- Python 3.11+ (Recommended: Python 3.13)
+- Homebrew (for macOS)
+- pip
+- pipx (recommended for CLI tools)
+
+### 🚀 Installation
+
+1. **Install Python 3.13 (macOS)**
+   ```bash
+   brew install python@3.13
+   ```
+
+2. **Install pipx**
+   ```bash
+   brew install pipx
+   pipx ensurepath  # Add pipx to PATH
+   ```
+
+3. **Install LangGraph CLI**
+   ```bash
+   pipx install "langgraph-cli[inmem]"
+   ```
+
+4. **Clone the Repository**
+   ```bash
+   git clone https://github.com/yourusername/ai-multi-agent-framework.git
+   cd ai-multi-agent-framework
+   ```
+
+5. **Create Virtual Environment**
+   ```bash
+   /opt/homebrew/bin/python3.13 -m venv venv
+   source venv/bin/activate
+   ```
+
+6. **Install Dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+### LangSmith Tracing (Optional)
+
+LangSmith provides advanced workflow visualization and debugging capabilities for your AI Agent Framework:
+
+- **Not required for basic functionality**
+- Offers deep insights into workflow execution
+- Provides performance metrics and detailed error tracking
+
+#### Setup LangSmith Tracing
+
+1. Sign up at https://smith.langchain.com/
+2. Get an API key
+3. Set environment variables:
+   ```bash
+   export LANGSMITH_API_KEY='your-api-key'
+   export LANGCHAIN_TRACING_V2=true
+   export LANGCHAIN_PROJECT=ai-agent-framework-demo
+   ```
+
+#### Tracing Features
+
+- Visualize complete workflow execution
+- Step-by-step debugging
+- Performance analysis
+- Error tracking and insights
+
+#### Python Version Compatibility
+
+- The framework is primarily tested with Python 3.11 and 3.13
+- Minimum supported version: Python 3.9
+- For best experience, use Python 3.11+
+  - Ensures full compatibility with LangGraph CLI
+  - Access to latest language features
+  - Optimal performance
+
+#### Potential Setup Challenges
+
+- If using Python < 3.11:
+  - Some advanced features might be limited
+  - Potential compatibility warnings
+  - Recommended to upgrade Python version
+
+- API Key Requirements:
+  - OpenAI and/or Anthropic API keys are required
+  - Set these in the `.env` file or as environment variables
+  - Without API keys, some functionalities will be restricted
 
 ### Setup
 
@@ -71,7 +154,7 @@ cp env.example .env
 langgraph dev --port 3005
 
 # In another terminal, run the demo
-python run_langgraph_demo.py
+python3 run_langgraph_demo.py
 
 # Open LangGraph Studio in browser
 # https://smith.langchain.com/studio/?baseUrl=http://127.0.0.1:3005
@@ -100,10 +183,10 @@ langgraph dev --port 3005
 **3. Run Workflows**
 ```bash
 # Run automated demo scenarios
-echo "1" | python run_langgraph_demo.py
+echo "1" | python3 run_langgraph_demo.py
 
 # Or run interactively
-python run_langgraph_demo.py
+python3 run_langgraph_demo.py
 ```
 
 ### LangSmith Integration
@@ -169,20 +252,88 @@ The included demo runs three scenarios:
 
 ```bash
 # List available agents
-python main.py cli list-agents
+python3 main.py cli list-agents
 
 # Process email
-python main.py cli process-email --email-file sample.eml
+python3 main.py cli process-email --email-file sample.eml
 
 # Process webhook
-python main.py cli process-webhook --data '{"type": "support", "message": "Help needed"}'
+python3 main.py cli process-webhook --data '{"type": "support", "message": "Help needed"}'
 
 # Start API server
-python main.py api --host 0.0.0.0 --port 8000
+python3 main.py api --host 0.0.0.0 --port 8000
 
 # Run with specific config
-python main.py --config configs/prod_config.py api
+python3 main.py --config configs/prod_config.py api
 ```
+
+### Email Processing
+
+The AI Agent Framework supports processing emails from two formats:
+- `.eml` (standard email format)
+- `.json` (custom JSON email representation)
+
+#### Supported File Formats
+
+1. **EML Format**:
+   - Standard email file format
+   - Parsed using Python's `email` module
+   - Supports full email headers and multipart messages
+
+2. **JSON Format**:
+   - Custom JSON structure for email representation
+   - Easier to generate programmatically
+   - Consistent with framework's input data model
+
+**JSON Email Structure**:
+```json
+{
+    "source": "email",
+    "data": {
+        "email": {
+            "subject": "Email Subject",
+            "sender": "sender@example.com",
+            "recipient": "recipient@example.com",
+            "body": "Email body text",
+            "headers": {
+                "Date": "Timestamp",
+                "Message-ID": "Unique message identifier"
+            }
+        }
+    }
+}
+```
+
+#### Processing Commands
+
+```bash
+# Process sales inquiry email
+python3 main.py cli process-email examples/email_samples/sales_inquiry.json
+
+# Process support email
+python3 main.py cli process-email examples/email_samples/support_email.json
+
+# Process demo request email
+python3 main.py cli process-email examples/email_samples/demo_request.json
+
+# Process with specific agent
+python3 main.py cli process-email examples/email_samples/sales_inquiry.json --agent sales_agent
+```
+
+**Pro Tips**:
+- Use the provided example files to quickly test email processing
+- Modify example files or create new ones in `examples/email_samples/`
+- Specify an agent to override default routing
+- Check logs for detailed processing information
+
+### Customizing Email Processing
+
+You can customize email processing by:
+- Modifying routing criteria in `graphs/multiagent_graph.py`
+- Adding custom keywords in `_select_agent` method
+- Extending agent capabilities in respective agent classes
+
+**Pro Tip**: Use environment variables to configure email processing behavior dynamically.
 
 ## 🔧 Configuration
 
@@ -273,7 +424,7 @@ export LOG_LEVEL=DEBUG
 
 # Run with tracing
 export LANGCHAIN_TRACING_V2=true
-python run_langgraph_demo.py
+python3 run_langgraph_demo.py
 
 # Check server health
 curl http://localhost:3005/ok
@@ -283,18 +434,18 @@ curl http://localhost:3005/ok
 
 ```bash
 # Run all tests
-python -m pytest tests/
+python3 -m pytest tests/
 
 # Run specific test categories
-python -m pytest tests/test_agents.py
-python -m pytest tests/integration/
-python -m pytest tests/performance/
+python3 -m pytest tests/test_agents.py
+python3 -m pytest tests/integration/
+python3 -m pytest tests/performance/
 
 # Run with coverage
-python -m pytest --cov=. tests/
+python3 -m pytest --cov=. tests/
 
 # Load testing
-python tests/performance/test_load_stress.py
+python3 tests/performance/test_load_stress.py
 ```
 
 ## 🚀 Deployment
@@ -403,13 +554,13 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Debug Commands
 ```bash
 # Test LangSmith connection
-python -c "from langsmith import Client; print('Connected:', bool(Client().list_runs(limit=1)))"
+python3 -c "from langsmith import Client; print('Connected:', bool(Client().list_runs(limit=1)))"
 
 # Validate environment
-python -c "import os; print('Keys set:', bool(os.getenv('LANGSMITH_API_KEY')))"
+python3 -c "import os; print('Keys set:', bool(os.getenv('LANGSMITH_API_KEY')))"
 
 # Test workflow without tracing
-LANGCHAIN_TRACING_V2=false python run_langgraph_demo.py
+LANGCHAIN_TRACING_V2=false python3 run_langgraph_demo.py
 ```
 
 ### Getting Help
@@ -422,3 +573,114 @@ LANGCHAIN_TRACING_V2=false python run_langgraph_demo.py
 ---
 
 **Built with ❤️ using LangGraph, LangSmith, and modern Python practices.**
+
+### 🔍 LangGraph Visualization & Tracing
+
+#### Setting Up LangSmith Tracing
+
+1. **Sign Up for LangSmith**
+   - Visit: https://smith.langchain.com/
+   - Create a free account
+   - Get your API key
+
+2. **Configure Environment Variables**
+   ```bash
+   # In your .env file or export in terminal
+   export LANGCHAIN_TRACING_V2=true
+   export LANGSMITH_PROJECT='ai-agent-framework'
+   export LANGSMITH_API_KEY='your-api-key-here'
+   ```
+
+3. **Install LangGraph CLI**
+   ```bash
+   # Install LangGraph CLI with inmem support
+   python3 -m pip install --user -U "langgraph-cli[inmem]"
+   
+   # Add to PATH (if needed)
+   export PATH="/Users/$USER/Library/Python/3.9/bin:$PATH"
+   ```
+
+4. **Start LangGraph Development Server**
+   ```bash
+   # Start the dev server with blocking operations allowed
+   langgraph dev --port 3005 --allow-blocking
+   ```
+
+5. **Run Email Processing**
+   ```bash
+   # Process an email with LangSmith tracing
+   python3 main.py cli process-email examples/email_samples/sales_inquiry.json
+   ```
+
+6. **View Workflow Visualization**
+   - Open your browser to: http://localhost:3005
+   - Connect with your LangSmith API key
+   - View real-time workflow execution
+
+#### Workflow Visualization Steps
+
+1. **Workflow Initialization**
+   - Capture input context
+   - Generate unique workflow ID
+   - Prepare for routing
+
+2. **Agent Routing**
+   - Analyze input data
+   - Select appropriate agent
+   - Log routing decision
+
+3. **Agent Processing**
+   - Execute selected agent's logic
+   - Capture processing insights
+   - Log processing results
+
+4. **Result Validation**
+   - Check response completeness
+   - Verify processing success
+   - Log validation status
+
+5. **Response Finalization**
+   - Compile final output
+   - Add debugging metadata
+   - Log workflow completion
+
+#### Troubleshooting Visualization
+
+- **No Graph Appearing?**
+  1. Confirm API key is correct
+  2. Ensure `LANGCHAIN_TRACING_V2` is `true`
+  3. Check network connection
+  4. Verify LangSmith project settings
+
+- **Common Issues**
+  - Incorrect API key
+  - Network connectivity problems
+  - Firewall blocking LangSmith connections
+
+#### Advanced Tracing Configuration
+
+```python
+# Programmatic LangSmith Configuration
+from langsmith import Client
+
+client = Client(
+    api_key=os.getenv('LANGSMITH_API_KEY'),
+    project=os.getenv('LANGSMITH_PROJECT', 'ai-agent-framework')
+)
+```
+
+#### Performance Insights
+
+- **Tracing Overhead**: Minimal performance impact
+- **Data Captured**:
+  - Workflow execution times
+  - Agent processing details
+  - Error tracking
+  - Routing decisions
+
+#### Security Considerations
+
+- API key is sensitive; keep it confidential
+- Use environment variables for configuration
+- Avoid hardcoding credentials
+- Rotate API keys periodically

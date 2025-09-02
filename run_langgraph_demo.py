@@ -23,7 +23,8 @@ os.environ["LANGCHAIN_PROJECT"] = "ai-agent-framework-demo"
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from graphs.multiagent_graph import MultiAgentGraph
-from agents import DefaultAgent, SalesAgent
+from agents.default_agent import DefaultAgent
+from agents.sales_agent import SalesAgent
 from models.data_models import AgentResult
 
 

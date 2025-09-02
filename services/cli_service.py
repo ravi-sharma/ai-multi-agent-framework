@@ -362,3 +362,160 @@ class CLIService:
         }
         
         return agents.get(agent_name)
+    
+    async def process_email(self, email_file_path: str, agent_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Process an email file (.eml or .json format).
+        
+        Args:
+            email_file_path: Path to the email file
+            agent_name: Optional specific agent to use
+            
+        Returns:
+            Processing result
+        """
+        try:
+            import email
+            from email.parser import Parser
+            import json
+            
+            email_file_path = Path(email_file_path)
+            
+            if not email_file_path.exists():
+                raise FileNotFoundError(f"Email file not found: {email_file_path}")
+            
+            # Determine file type and parse accordingly
+            if email_file_path.suffix.lower() == '.eml':
+                # Parse .eml file
+                with open(email_file_path, 'r') as f:
+                    msg = Parser().parse(f)
+                
+                # Extract email data
+                email_data = {
+                    "subject": msg.get('Subject', ''),
+                    "sender": msg.get('From', ''),
+                    "recipient": msg.get('To', ''),
+                    "body": self._extract_email_body(msg),
+                    "headers": dict(msg.items()),
+                    "date": msg.get('Date', '')
+                }
+            elif email_file_path.suffix.lower() in ['.json', '.jsonl']:
+                # Parse JSON file
+                with open(email_file_path, 'r') as f:
+                    email_input = json.load(f)
+                
+                # Extract email data from JSON
+                email_data = email_input.get('data', {}).get('email', {})
+            else:
+                raise ValueError(f"Unsupported file type: {email_file_path.suffix}")
+            
+            # Create input data for processing
+            input_data = {
+                "source": "email",
+                "data": {
+                    "email": email_data,
+                    "file_path": str(email_file_path),
+                    "file_name": email_file_path.name
+                }
+            }
+            
+            if agent_name:
+                input_data["requested_agent"] = agent_name
+            
+            # Process through framework
+            if self.framework:
+                result = await self.framework.process(input_data)
+            else:
+                result = await self._mock_process(input_data)
+            
+            return {
+                "success": True,
+                "email_file": str(email_file_path),
+                "email_subject": email_data.get("subject", ""),
+                "email_sender": email_data.get("sender", ""),
+                "agent_used": result.get("agent_name", "unknown"),
+                "result": result,
+                "processed_at": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing email file {email_file_path}: {e}")
+            return {
+                "success": False,
+                "email_file": str(email_file_path) if 'email_file_path' in locals() else "unknown",
+                "error": str(e),
+                "processed_at": datetime.now().isoformat()
+            }
+    
+    async def process_webhook(self, webhook_data: Dict[str, Any], agent_name: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Process webhook data.
+        
+        Args:
+            webhook_data: Dictionary containing webhook payload
+            agent_name: Optional specific agent to use
+            
+        Returns:
+            Processing result
+        """
+        try:
+            # Create input data for processing
+            input_data = {
+                "source": "webhook",
+                "data": webhook_data
+            }
+            
+            if agent_name:
+                input_data["requested_agent"] = agent_name
+            
+            # Process through framework
+            if self.framework:
+                result = await self.framework.process(input_data)
+            else:
+                result = await self._mock_process(input_data)
+            
+            return {
+                "success": True,
+                "webhook_type": webhook_data.get("type", "unknown"),
+                "agent_used": result.get("agent_name", "unknown"),
+                "result": result,
+                "processed_at": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error processing webhook data: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "processed_at": datetime.now().isoformat()
+            }
+    
+    def _extract_email_body(self, msg) -> str:
+        """
+        Extract email body from email message.
+        
+        Args:
+            msg: Email message object
+            
+        Returns:
+            Email body text
+        """
+        body = ""
+        
+        if msg.is_multipart():
+            for part in msg.walk():
+                content_type = part.get_content_type()
+                content_disposition = str(part.get("Content-Disposition"))
+                
+                # Skip attachments
+                if "attachment" not in content_disposition:
+                    if content_type == "text/plain":
+                        body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+                        break
+                    elif content_type == "text/html" and not body:
+                        # Fallback to HTML if no plain text
+                        body = part.get_payload(decode=True).decode('utf-8', errors='ignore')
+        else:
+            body = msg.get_payload(decode=True).decode('utf-8', errors='ignore')
+        
+        return body.strip()

@@ -54,64 +54,100 @@ class SalesAgent(BaseAgent):
             # Process email data
             email_data = input_data.get('data', {}).get('email', {})
             
-            # Create EmailMessage object
+            # Create EmailMessage object with optional recipient
             email_message = EmailMessage(
                 subject=email_data.get('subject', ''),
                 sender=email_data.get('sender', ''),
-                recipient=email_data.get('recipient', ''),
+                recipient=email_data.get('recipient', 'sales@company.com'),
                 body=email_data.get('body', ''),
                 headers=email_data.get('headers', {}),
                 timestamp=datetime.now()
             )
             
-            # Extract customer information
-            customer_info = self._extract_customer_info(email_message)
+            # Analyze email intent
+            intent_analysis = await self.analyze_intent(email_message)
             
-            # Analyze intent
-            intent_analysis = self._analyze_intent(email_message)
-            
-            # Generate sales notes
-            sales_notes = self._generate_sales_notes(email_message, customer_info, intent_analysis)
+            # Prepare final output
+            final_output = {
+                'intent': intent_analysis.get('intent', 'unknown'),
+                'urgency': intent_analysis.get('urgency', 'low'),
+                'customer_details': {
+                    'email': email_message.sender,
+                    'company': intent_analysis.get('company', 'Unknown')
+                }
+            }
             
             # Calculate execution time
             execution_time = (datetime.now() - start_time).total_seconds()
-            
-            # Create final output
-            final_output = {
-                'agent_type': 'sales',
-                'customer_email': customer_info['email'],
-                'customer_domain': customer_info['domain'],
-                'primary_intent': intent_analysis.get('primary_intent', 'unknown'),
-                'urgency_level': sales_notes.urgency_level,
-                'requires_human_review': sales_notes.follow_up_required or sales_notes.urgency_level in ['high', 'critical'],
-                'sales_notes': sales_notes.to_dict(),
-                'processing_notes': [
-                    f"Processed email from {customer_info['email']}",
-                    f"Identified intent: {intent_analysis.get('primary_intent', 'unknown')}",
-                    f"Urgency level: {sales_notes.urgency_level}",
-                    f"Follow-up required: {sales_notes.follow_up_required}"
-                ]
-            }
             
             return AgentResult(
                 success=True,
                 output=final_output,
                 agent_name=self.name,
                 execution_time=execution_time,
-                notes=final_output['processing_notes'],
-                requires_human_review=final_output['requires_human_review']
+                notes=[
+                    f"Processed email from {email_message.sender}",
+                    f"Identified intent: {intent_analysis.get('intent', 'unknown')}",
+                    f"Urgency level: {intent_analysis.get('urgency', 'low')}"
+                ]
             )
-                
+        
         except Exception as e:
-            execution_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"Sales agent processing failed: {e}", exc_info=True)
+            logger.error(f"Sales agent processing error: {e}")
             return AgentResult(
                 success=False,
                 output={},
                 agent_name=self.name,
                 error_message=str(e),
-                execution_time=execution_time
+                execution_time=(datetime.now() - start_time).total_seconds()
             )
+    
+    async def analyze_intent(self, email_message: EmailMessage) -> Dict[str, Any]:
+        """
+        Analyze the intent of an incoming email.
+        
+        Args:
+            email_message: Email message to analyze
+            
+        Returns:
+            Dictionary with intent analysis details
+        """
+        try:
+            # Basic intent analysis using simple keyword matching
+            subject = email_message.subject.lower()
+            body = email_message.body.lower()
+            
+            # Determine intent
+            if 'pricing' in subject or 'pricing' in body:
+                intent = 'pricing_inquiry'
+                urgency = 'high'
+            elif 'enterprise' in subject or 'enterprise' in body:
+                intent = 'enterprise_plan'
+                urgency = 'medium'
+            elif 'plan' in subject or 'plan' in body:
+                intent = 'plan_details'
+                urgency = 'low'
+            else:
+                intent = 'general_inquiry'
+                urgency = 'low'
+            
+            # Extract company name (basic extraction)
+            company = email_message.sender.split('@')[-1].split('.')[0].capitalize()
+            
+            return {
+                'intent': intent,
+                'urgency': urgency,
+                'company': company,
+                'sender_email': email_message.sender
+            }
+        except Exception as e:
+            logger.error(f"Intent analysis error: {e}")
+            return {
+                'intent': 'unknown',
+                'urgency': 'low',
+                'company': 'Unknown',
+                'sender_email': email_message.sender
+            }
     
     def _extract_customer_info(self, email_message: EmailMessage) -> Dict[str, Any]:
         """

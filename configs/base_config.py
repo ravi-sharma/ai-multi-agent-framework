@@ -4,6 +4,22 @@ import os
 from typing import Dict, Any, Optional
 from pathlib import Path
 
+# Only load dotenv if not in ASGI context
+try:
+    from dotenv import load_dotenv
+    # Check if we're in an async context (LangGraph dev server)
+    import asyncio
+    try:
+        asyncio.get_running_loop()
+        # We're in an async context, skip load_dotenv to avoid blocking
+        pass
+    except RuntimeError:
+        # Not in async context, safe to load dotenv
+        load_dotenv()
+except ImportError:
+    # python-dotenv not available, skip
+    pass
+
 
 class BaseConfig:
     """Base configuration class with common settings."""
@@ -14,8 +30,15 @@ class BaseConfig:
         self.config_dir = self.project_root / "configs"
         self.data_dir = self.project_root / "data"
         
-        # Ensure data directory exists
-        self.data_dir.mkdir(exist_ok=True)
+        # Ensure data directory exists (skip in async context to avoid blocking)
+        try:
+            import asyncio
+            asyncio.get_running_loop()
+            # We're in an async context, skip mkdir to avoid blocking
+            pass
+        except RuntimeError:
+            # Not in async context, safe to create directory
+            self.data_dir.mkdir(exist_ok=True)
     
     # Environment
     DEBUG = os.getenv("DEBUG", "false").lower() == "true"
