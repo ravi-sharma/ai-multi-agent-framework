@@ -1,13 +1,10 @@
 """Simplified sales agent implementation."""
 
-import logging
 from typing import Dict, Any, List
 from datetime import datetime
 
 from agents.base_agent import BaseAgent
 from models.data_models import AgentResult, EmailMessage, SalesNotes
-
-logger = logging.getLogger(__name__)
 
 
 class SalesAgent(BaseAgent):
@@ -26,7 +23,6 @@ class SalesAgent(BaseAgent):
             config: Agent configuration
         """
         super().__init__(name, config)
-        logger.info(f"Initialized sales agent '{self.name}'")
     
     async def process(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -93,7 +89,7 @@ class SalesAgent(BaseAgent):
             )
         
         except Exception as e:
-            logger.error(f"Sales agent processing error: {e}")
+            self.log_error("Sales agent processing error", error=e)
             return AgentResult(
                 success=False,
                 output={},
@@ -141,7 +137,7 @@ class SalesAgent(BaseAgent):
                 'sender_email': email_message.sender
             }
         except Exception as e:
-            logger.error(f"Intent analysis error: {e}")
+            self.log_error("Intent analysis error", error=e)
             return {
                 'intent': 'unknown',
                 'urgency': 'low',

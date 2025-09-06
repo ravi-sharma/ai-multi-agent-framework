@@ -1,13 +1,10 @@
 """Simplified default agent implementation."""
 
-import logging
 from typing import Dict, Any, List
 from datetime import datetime
 
 from agents.base_agent import BaseAgent
 from models.data_models import AgentResult
-
-logger = logging.getLogger(__name__)
 
 
 class DefaultAgent(BaseAgent):
@@ -27,16 +24,10 @@ class DefaultAgent(BaseAgent):
         """
         super().__init__(name, config)
         
-        # Ensure config is not None
-        if config is None:
-            config = {}
-        
         # Configuration options for default behavior
-        self.response_template = config.get('response_template', 
+        self.response_template = self.get_config_value('response_template', 
             "Thank you for your message. We have received your request and will respond appropriately.")
-        self.log_unmatched_requests = config.get('log_unmatched_requests', True)
-        
-        logger.info(f"Initialized default agent '{self.name}'")
+        self.log_unmatched_requests = self.get_config_value('log_unmatched_requests', True)
     
     async def process(self, input_data: Dict[str, Any]) -> AgentResult:
         """
@@ -84,12 +75,12 @@ class DefaultAgent(BaseAgent):
                 requires_human_review=True  # Default agent results typically need human review
             )
             
-            logger.info(f"Default agent processed request in {execution_time:.2f}s")
+            self.log_info(f"Default agent processed request in {execution_time:.2f}s")
             return result
             
         except Exception as e:
             execution_time = (datetime.now() - start_time).total_seconds()
-            logger.error(f"Default agent processing failed: {e}", exc_info=True)
+            self.log_error("Default agent processing failed", error=e)
             return AgentResult(
                 success=False,
                 output={},
@@ -141,8 +132,8 @@ class DefaultAgent(BaseAgent):
             'data_keys': list(input_data.keys()) if isinstance(input_data, dict) else []
         }
         
-        logger.info(f"Default agent handling unmatched request: {log_details}")
-        logger.warning(f"Unmatched request routed to default agent from {source}")
+        self.log_info("Default agent handling unmatched request", **log_details)
+        self.log_warning(f"Unmatched request routed to default agent from {source}")
     
     def get_workflow_config(self):
         """Get the workflow configuration for this agent."""

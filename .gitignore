@@ -1,0 +1,10 @@
+data/cache/*
+data/cache/.*
+data/logs/*
+data/logs/.*
+data/backups/*
+data/backups/.*
+data/temp/*
+data/temp/.*
+data/tests/*
+data/tests/.*

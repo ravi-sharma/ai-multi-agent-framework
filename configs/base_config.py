@@ -2,64 +2,133 @@
 
 import os
 from typing import Dict, Any, Optional
-from pathlib import Path
 
-# Only load dotenv if not in ASGI context
-try:
-    from dotenv import load_dotenv
-    # Check if we're in an async context (LangGraph dev server)
-    import asyncio
-    try:
-        asyncio.get_running_loop()
-        # We're in an async context, skip load_dotenv to avoid blocking
-        pass
-    except RuntimeError:
-        # Not in async context, safe to load dotenv
-        load_dotenv()
-except ImportError:
-    # python-dotenv not available, skip
-    pass
-
+from utils.paths import get_project_root, get_data_path
+from utils.cache import cached_config
 
 class BaseConfig:
     """Base configuration class with common settings."""
     
     def __init__(self):
         """Initialize base configuration."""
-        self.project_root = Path(__file__).parent.parent
+        self.project_root = get_project_root()
         self.config_dir = self.project_root / "configs"
-        self.data_dir = self.project_root / "data"
+        self.data_dir = get_data_path("")
         
-        # Ensure data directory exists (skip in async context to avoid blocking)
+        # Load environment variables if not in ASGI context
+        self._load_env_if_safe()
+    
+    def _load_env_if_safe(self):
+        """Load environment variables safely, avoiding blocking in ASGI context."""
         try:
-            import asyncio
-            asyncio.get_running_loop()
-            # We're in an async context, skip mkdir to avoid blocking
+            # Check if we're in an ASGI/async context by looking for common ASGI environment variables
+            if os.getenv('ASGI_APPLICATION') or os.getenv('UVICORN_HOST') or os.getenv('LANGGRAPH_API'):
+                # Skip loading .env in ASGI context to avoid blocking
+                return
+            
+            # Try to load dotenv only if not in async context
+            from dotenv import load_dotenv
+            load_dotenv()
+        except ImportError:
+            # python-dotenv not available, skip
             pass
-        except RuntimeError:
-            # Not in async context, safe to create directory
-            self.data_dir.mkdir(exist_ok=True)
+        except Exception:
+            # Any other error, skip silently
+            pass
     
     # Environment
-    DEBUG = os.getenv("DEBUG", "false").lower() == "true"
-    LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+    @cached_config(ttl=300)  # Cache for 5 minutes
+    def get_debug(self) -> bool:
+        return os.getenv("DEBUG", "false").lower() == "true"
+    
+    @cached_config(ttl=300)
+    def get_log_level(self) -> str:
+        return os.getenv("LOG_LEVEL", "INFO")
     
     # API Configuration
-    API_HOST = os.getenv("API_HOST", "0.0.0.0")
-    API_PORT = int(os.getenv("API_PORT", "8000"))
-    API_WORKERS = int(os.getenv("API_WORKERS", "1"))
+    @cached_config(ttl=300)
+    def get_api_host(self) -> str:
+        return os.getenv("API_HOST", "0.0.0.0")
+    
+    @cached_config(ttl=300)
+    def get_api_port(self) -> int:
+        return int(os.getenv("API_PORT", "8000"))
+    
+    @cached_config(ttl=300)
+    def get_api_workers(self) -> int:
+        return int(os.getenv("API_WORKERS", "1"))
     
     # LLM Provider Configuration
-    DEFAULT_LLM_PROVIDER = os.getenv("DEFAULT_LLM_PROVIDER", "openai")
+    @cached_config(ttl=300)
+    def get_default_llm_provider(self) -> str:
+        return os.getenv("DEFAULT_LLM_PROVIDER", "openai")
     
     # OpenAI Configuration
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-    OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4")
-    OPENAI_MAX_TOKENS = int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
-    OPENAI_TEMPERATURE = float(os.getenv("OPENAI_TEMPERATURE", "0.3"))
+    @cached_config(ttl=300)
+    def get_openai_api_key(self) -> Optional[str]:
+        return os.getenv("OPENAI_API_KEY")
+    
+    @cached_config(ttl=300)
+    def get_openai_model(self) -> str:
+        return os.getenv("OPENAI_MODEL", "gpt-4")
+    
+    @cached_config(ttl=300)
+    def get_openai_max_tokens(self) -> int:
+        return int(os.getenv("OPENAI_MAX_TOKENS", "2000"))
+    
+    @cached_config(ttl=300)
+    def get_openai_temperature(self) -> float:
+        return float(os.getenv("OPENAI_TEMPERATURE", "0.3"))
     
     # Anthropic Configuration
-    ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY")
+    @cached_config(ttl=300)
+    def get_anthropic_api_key(self) -> Optional[str]:
+        return os.getenv("ANTHROPIC_API_KEY")
+    
+    # Properties for backward compatibility
+    @property
+    def DEBUG(self) -> bool:
+        return self.get_debug()
+    
+    @property
+    def LOG_LEVEL(self) -> str:
+        return self.get_log_level()
+    
+    @property
+    def API_HOST(self) -> str:
+        return self.get_api_host()
+    
+    @property
+    def API_PORT(self) -> int:
+        return self.get_api_port()
+    
+    @property
+    def API_WORKERS(self) -> int:
+        return self.get_api_workers()
+    
+    @property
+    def DEFAULT_LLM_PROVIDER(self) -> str:
+        return self.get_default_llm_provider()
+    
+    @property
+    def OPENAI_API_KEY(self) -> Optional[str]:
+        return self.get_openai_api_key()
+    
+    @property
+    def OPENAI_MODEL(self) -> str:
+        return self.get_openai_model()
+    
+    @property
+    def OPENAI_MAX_TOKENS(self) -> int:
+        return self.get_openai_max_tokens()
+    
+    @property
+    def OPENAI_TEMPERATURE(self) -> float:
+        return self.get_openai_temperature()
+    
+    @property
+    def ANTHROPIC_API_KEY(self) -> Optional[str]:
+        return self.get_anthropic_api_key()
     ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-3-sonnet-20240229")
     ANTHROPIC_MAX_TOKENS = int(os.getenv("ANTHROPIC_MAX_TOKENS", "2000"))
     

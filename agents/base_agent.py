@@ -3,34 +3,17 @@
 from abc import ABC, abstractmethod
 from typing import Dict, Any, List
 import uuid
-import logging
-from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from utils.common_mixins import AgentMixin
 
 
-class BaseAgent(ABC):
+class BaseAgent(AgentMixin, ABC):
     """
     Abstract base class for all agents in the AI Agent Framework.
     
     This class defines the standard interface that all agents must implement,
     ensuring consistency and interoperability across different agent types.
     """
-    
-    def __init__(self, name: str, config: Dict[str, Any] = None):
-        """
-        Initialize the base agent.
-        
-        Args:
-            name: Unique identifier for the agent
-            config: Optional configuration dictionary for the agent
-        """
-        self.name = name
-        self.config = config or {}
-        self.created_at = datetime.now()
-        self.is_enabled = self.config.get('enabled', True)
-        
-        logger.info(f"Initialized agent '{self.name}' with config keys: {list(self.config.keys())}")
     
     @abstractmethod
     async def process(self, input_data: Dict[str, Any]):
@@ -106,31 +89,6 @@ class BaseAgent(ABC):
         Returns:
             Dictionary containing agent metadata
         """
-        return {
-            'name': self.name,
-            'type': self.__class__.__name__,
-            'enabled': self.is_enabled,
-            'created_at': self.created_at.isoformat(),
-            'required_capabilities': self.get_required_llm_capabilities(),
-            'config': self.config
-        }
-    
-    def enable(self):
-        """Enable this agent."""
-        self.is_enabled = True
-        logger.info(f"Agent '{self.name}' enabled")
-    
-    def disable(self):
-        """Disable this agent."""
-        self.is_enabled = False
-        logger.info(f"Agent '{self.name}' disabled")
-    
-    def update_config(self, new_config: Dict[str, Any]):
-        """
-        Update agent configuration.
-        
-        Args:
-            new_config: New configuration dictionary
-        """
-        self.config.update(new_config)
-        logger.info(f"Updated config for agent '{self.name}'")
+        info = super().get_agent_info()
+        info['required_capabilities'] = self.get_required_llm_capabilities()
+        return info
