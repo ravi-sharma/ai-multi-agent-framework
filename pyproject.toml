@@ -30,7 +30,7 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     # Core dependencies - aligned with requirements.txt
-    "langchain-core==0.3.75",
+    "langchain-core==0.3.81",
     "langchain-community==0.3.29", 
     "langgraph==0.6.6",
     "langsmith==0.4.21",

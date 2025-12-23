@@ -1,6 +1,6 @@
 # Core LangChain/LangGraph
 langgraph==0.6.6
-langchain-core==0.3.75
+langchain-core==0.3.81
 langchain-community==0.3.29
 langsmith==0.4.21
 
