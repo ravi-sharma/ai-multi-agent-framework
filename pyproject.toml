@@ -33,7 +33,7 @@ dependencies = [
     "langchain-core==0.3.75",
     "langchain-community==0.3.29", 
     "langgraph==0.6.6",
-    "langsmith==0.4.21",
+    "langsmith==0.6.3",
     
     # LLM Provider dependencies
     "openai>=1.0.0",
